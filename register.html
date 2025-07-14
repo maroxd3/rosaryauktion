@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Register to Bid</title>
+  <style>
+    body {
+      background: #000;
+      color: #ffd700;
+      font-family: 'Cinzel', serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 50px;
+      height: 100vh;
+      margin: 0;
+    }
+    h1 {
+      margin-bottom: 20px;
+    }
+    input {
+      margin: 8px 0;
+      padding: 8px;
+      width: 260px;
+      border: 1px solid #ffd700;
+      border-radius: 4px;
+      background: rgba(0, 0, 0, 0.8);
+      color: #ffd700;
+      font-size: 16px;
+    }
+    button {
+      margin-top: 12px;
+      padding: 10px 20px;
+      background: #ffd700;
+      color: #000;
+      border: none;
+      border-radius: 4px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button:hover {
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body>
+  <h1>Register to Bid</h1>
+  <input id="name" placeholder="Your Name" type="text">
+  <input id="whatsapp" placeholder="WhatsApp Number" type="tel">
+  <button onclick="register()">Register</button>
+
+  <!-- Firebase compat SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+  <script>
+    // Your Firebase configuration (copy-pasted from the console)
+    const firebaseConfig = {
+      apiKey: "AIzaSyCEzZsilk06LeSomZx3VlPdhQoe-GUqTuQ",
+      authDomain: "rosayauktion.firebaseapp.com",
+      databaseURL: "https://rosayauktion-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "rosayauktion",
+      storageBucket: "rosayauktion.firebasestorage.app",
+      messagingSenderId: "853081785147",
+      appId: "1:853081785147:web:dd3fa69e2cff3e96a42d1e",
+      measurementId: "G-8MY9PX1RNH"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    function register() {
+      const name = document.getElementById('name').value.trim();
+      const whatsapp = document.getElementById('whatsapp').value.trim();
+      if (!name || !whatsapp) {
+        return alert('Both fields are required.');
+      }
+      // Push to /bidders
+      db.ref('bidders').push({ name, whatsapp, timestamp: Date.now() });
+      alert('Thanks! You’re registered.');
+      // Clear inputs
+      document.getElementById('name').value = '';
+      document.getElementById('whatsapp').value = '';
+    }
+  </script>
+</body>
+</html>
