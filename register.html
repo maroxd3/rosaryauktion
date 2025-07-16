@@ -4,43 +4,7 @@
   <meta charset="utf-8">
   <title>Register to Bid</title>
   <style>
-    body {
-      background: #000;
-      color: #ffd700;
-      font-family: 'Cinzel', serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding-top: 50px;
-      height: 100vh;
-      margin: 0;
-    }
-    h1 {
-      margin-bottom: 20px;
-    }
-    input {
-      margin: 8px 0;
-      padding: 8px;
-      width: 260px;
-      border: 1px solid #ffd700;
-      border-radius: 4px;
-      background: rgba(0, 0, 0, 0.8);
-      color: #ffd700;
-      font-size: 16px;
-    }
-    button {
-      margin-top: 12px;
-      padding: 10px 20px;
-      background: #ffd700;
-      color: #000;
-      border: none;
-      border-radius: 4px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-    button:hover {
-      opacity: 0.9;
-    }
+    /* (your existing styles here) */
   </style>
 </head>
 <body>
@@ -53,32 +17,53 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
   <script>
-    // Your Firebase configuration (copy-pasted from the console)
+    // 1) Your Firebase config
     const firebaseConfig = {
-  apiKey: "AIzaSyCEzZsilk06LeSomZx3VlPdhQoe-GUqTuQ",
-  authDomain: "rosayauktion.firebaseapp.com",
-  databaseURL: "https://rosayauktion-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "rosayauktion",
-  storageBucket: "rosayauktion.firebasestorage.app",
-  messagingSenderId: "853081785147",
-  appId: "1:853081785147:web:dd3fa69e2cff3e96a42d1e",
-  measurementId: "G-8MY9PX1RNH"
+      apiKey: "AIzaSyCEzZsilk06LeSomZx3VlPdhQoe-GUqTuQ",
+      authDomain: "rosayauktion.firebaseapp.com",
+      databaseURL: "https://rosayauktion-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "rosayauktion",
+      storageBucket: "rosayauktion.firebasestorage.app",
+      messagingSenderId: "853081785147",
+      appId: "1:853081785147:web:dd3fa69e2cff3e96a42d1e",
+      measurementId: "G-8MY9PX1RNH"
     };
-
-    // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
+    // 2) Your Apps Script Web‑App URL
+    const SHEET_URL = 'https://script.google.com/macros/s/AKfycbzDBV97oLpNt0dexYgEGko0jjnHmOxk2X6cy9dqUL8pLkhMUqI9qdRG8evFnuL1z6LHdA/exec';
+
     function register() {
-      const name = document.getElementById('name').value.trim();
+      const name     = document.getElementById('name').value.trim();
       const whatsapp = document.getElementById('whatsapp').value.trim();
       if (!name || !whatsapp) {
         return alert('Both fields are required.');
       }
-      // Push to /bidders
-      db.ref('bidders').push({ name, whatsapp, timestamp: Date.now() });
-      alert('Thanks! You’re registered.');
-      // Clear inputs
+
+      // A) Push into Firebase (optional, if you still need it)
+      db.ref('bidders').push({ name, whatsapp, timestamp: Date.now() })
+        .then(() => console.log('✔️ Firebase write succeeded'))
+        .catch(err => console.error('❌ Firebase write failed:', err));
+
+      // B) POST to your Google Sheet via Apps Script
+      fetch(SHEET_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alias: name, whatsapp })
+      })
+      .then(res => res.json())
+      .then(json => {
+        if (json.status === 'success') {
+          console.log('✅ Sheet append succeeded');
+        } else {
+          console.error('❌ Sheet error:', json.message);
+        }
+      })
+      .catch(err => console.error('✖️ Fetch to sheet failed:', err));
+
+      // C) User feedback & cleanup
+      alert(`Thanks ${name}! You’re registered to bid.`);
       document.getElementById('name').value = '';
       document.getElementById('whatsapp').value = '';
     }
