@@ -92,7 +92,7 @@
       // Push only the alias to /bidders (no phone)
       if (alias) {
         db.ref('bidders').push({
-          name: alias,
+          Alias: alias,
           timestamp: Date.now()
         });
       }
