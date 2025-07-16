@@ -3,70 +3,98 @@
 <head>
   <meta charset="utf-8">
   <title>Register to Bid</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    /* (your existing styles here) */
+    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&display=swap');
+
+    body {
+      background: #000;
+      color: #ffd700;
+      font-family: 'Cinzel', serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 50px;
+      height: 100vh;
+      margin: 0;
+    }
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 20px;
+    }
+    form {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    input {
+      padding: 8px;
+      width: 260px;
+      border: 1px solid #ffd700;
+      border-radius: 4px;
+      background: rgba(0, 0, 0, 0.8);
+      color: #ffd700;
+      font-size: 1rem;
+    }
+    button {
+      padding: 10px 20px;
+      background: #ffd700;
+      color: #000;
+      border: none;
+      border-radius: 4px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    button:hover {
+      background: #ffea47;
+    }
   </style>
 </head>
 <body>
   <h1>Register to Bid</h1>
-  <input id="name" placeholder="Your Name" type="text">
-  <input id="whatsapp" placeholder="WhatsApp Number" type="tel">
-  <button onclick="register()">Register</button>
 
-  <!-- Firebase compat SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+  <!--
+    1) Replace FORM_ACTION_URL below with your Form’s /formResponse URL
+    2) entry.1409023092_sentinel → TikTok Alias field
+    3) entry.1749874347_sentinel → WhatsApp Number field
+  -->
+  <form id="registerForm"
+        action="https://docs.google.com/forms/d/e/1FAIpQLSfhK8x6ck1KWtyRgTrem_uMx-cuGSvnNF63wkZfX_zdleUbng/viewform?usp=header"
+        method="POST"
+        target="hidden_iframe"
+        onsubmit="submitted=true;">
+    <input
+      name="entry.1409023092_sentinel"
+      id="name"
+      type="text"
+      placeholder="Your TikTok Alias"
+      required
+    >
+    <input
+      name="entry.1749874347_sentinel"
+      id="whatsapp"
+      type="tel"
+      placeholder="WhatsApp Number"
+      required
+    >
+    <button type="submit">Register</button>
+  </form>
+
+  <!-- invisible iframe to swallow the redirect response -->
+  <iframe name="hidden_iframe" style="display:none;"></iframe>
+
   <script>
-    // 1) Your Firebase config
-    const firebaseConfig = {
-      apiKey: "AIzaSyCEzZsilk06LeSomZx3VlPdhQoe-GUqTuQ",
-      authDomain: "rosayauktion.firebaseapp.com",
-      databaseURL: "https://rosayauktion-default-rtdb.europe-west1.firebasedatabase.app",
-      projectId: "rosayauktion",
-      storageBucket: "rosayauktion.firebasestorage.app",
-      messagingSenderId: "853081785147",
-      appId: "1:853081785147:web:dd3fa69e2cff3e96a42d1e",
-      measurementId: "G-8MY9PX1RNH"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-
-    // 2) Your Apps Script Web‑App URL
-    const SHEET_URL = 'https://script.google.com/macros/s/AKfycbwSPj2QSFHYquVQi43AB5WJD19UK6OS-pKblqSYpZEza_59_XiRKUDrcKlOajUnawatgQ/exec';
-
-    function register() {
-      const name     = document.getElementById('name').value.trim();
-      const whatsapp = document.getElementById('whatsapp').value.trim();
-      if (!name || !whatsapp) {
-        return alert('Both fields are required.');
+    // simple thank‑you feedback
+    let submitted = false;
+    setInterval(() => {
+      if (submitted) {
+        alert('✅ Thanks! You’re registered to bid.');
+        submitted = false;
+        document.getElementById('registerForm').reset();
       }
-
-      // A) Push into Firebase (optional, if you still need it)
-      db.ref('bidders').push({ name, whatsapp, timestamp: Date.now() })
-        .then(() => console.log('✔️ Firebase write succeeded'))
-        .catch(err => console.error('❌ Firebase write failed:', err));
-
-      // B) POST to your Google Sheet via Apps Script
-      fetch(SHEET_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ alias: name, whatsapp })
-      })
-      .then(res => res.json())
-      .then(json => {
-        if (json.status === 'success') {
-          console.log('✅ Sheet append succeeded');
-        } else {
-          console.error('❌ Sheet error:', json.message);
-        }
-      })
-      .catch(err => console.error('✖️ Fetch to sheet failed:', err));
-
-      // C) User feedback & cleanup
-      alert(`Thanks ${name}! You’re registered to bid.`);
-      document.getElementById('name').value = '';
-      document.getElementById('whatsapp').value = '';
-    }
+    }, 500);
   </script>
 </body>
 </html>
