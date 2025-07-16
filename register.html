@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <title>Register to Bid</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Elegant gold‑on‑black styling -->
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&display=swap');
 
@@ -14,67 +15,74 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding-top: 50px;
-      height: 100vh;
+      justify-content: start;
+      padding-top: 4rem;
+      min-height: 100vh;
       margin: 0;
     }
     h1 {
-      font-size: 2rem;
-      margin-bottom: 20px;
+      font-size: 2.5rem;
+      margin-bottom: 1.5rem;
+      text-shadow: 0 0 8px rgba(255,215,0,0.6);
     }
     form {
       display: flex;
       flex-direction: column;
-      align-items: center;
-      gap: 12px;
+      gap: 1rem;
+      width: 90%;
+      max-width: 320px;
     }
     input {
-      padding: 8px;
-      width: 260px;
+      padding: 0.75rem 1rem;
       border: 1px solid #ffd700;
-      border-radius: 4px;
-      background: rgba(0, 0, 0, 0.8);
+      border-radius: 6px;
+      background: rgba(0,0,0,0.8);
       color: #ffd700;
       font-size: 1rem;
+      outline: none;
+      transition: box-shadow 0.2s;
+    }
+    input:focus {
+      box-shadow: 0 0 8px rgba(255,215,0,0.8);
     }
     button {
-      padding: 10px 20px;
+      padding: 0.75rem 1rem;
       background: #ffd700;
       color: #000;
-      border: none;
-      border-radius: 4px;
       font-size: 1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 6px;
       cursor: pointer;
-      transition: background .2s;
+      transition: background 0.2s, transform 0.1s;
     }
     button:hover {
       background: #ffea47;
+      transform: translateY(-2px);
+    }
+    button:active {
+      transform: translateY(0);
     }
   </style>
 </head>
 <body>
   <h1>Register to Bid</h1>
 
-  <!--
-    1) Replace FORM_ACTION_URL below with your Form’s /formResponse URL
-    2) entry.1409023092_sentinel → TikTok Alias field
-    3) entry.1749874347_sentinel → WhatsApp Number field
-  -->
   <form id="registerForm"
-        action="https://docs.google.com/forms/u/0/d/e/1FAIpQLSfhK8x6ck1KWtyRgTrem_uMx-cuGSvnNF63wkZfX_zdleUbng/formResponse"
+        action="https://docs.google.com/forms/d/e/1FAIpQLSfhK8x6ck1KWtyRgTrem_uMx-cuGSvnNF63wkZfX_zdleUbng/formResponse"
         method="POST"
         target="hidden_iframe"
-        onsubmit="submitted=true;">
+        onsubmit="submitted = true;">
+    <!-- TikTok Alias -->
     <input
-      name="entry.1409023092_sentinel"
-      id="name"
+      name="entry.1409023092"
       type="text"
       placeholder="Your TikTok Alias"
       required
     >
+    <!-- WhatsApp Number -->
     <input
-      name="entry.1749874347_sentinel"
-      id="whatsapp"
+      name="entry.1749874347"
       type="tel"
       placeholder="WhatsApp Number"
       required
@@ -82,11 +90,11 @@
     <button type="submit">Register</button>
   </form>
 
-  <!-- invisible iframe to swallow the redirect response -->
+  <!-- Hidden iframe to swallow Google’s redirect -->
   <iframe name="hidden_iframe" style="display:none;"></iframe>
 
   <script>
-    // simple thank‑you feedback
+    // Show a quick thank‑you pop‑up after submission
     let submitted = false;
     setInterval(() => {
       if (submitted) {
@@ -94,7 +102,7 @@
         submitted = false;
         document.getElementById('registerForm').reset();
       }
-    }, 500);
+    }, 300);
   </script>
 </body>
 </html>
