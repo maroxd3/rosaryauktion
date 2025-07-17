@@ -4,6 +4,10 @@
   <meta charset="utf-8">
   <title>Register to Bid – سجل للمزايدة</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/css/intlTelInput.min.css"
+  />
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&display=swap');
     body {
@@ -23,10 +27,10 @@
       margin-bottom:1.5rem;
       text-shadow:0 0 8px rgba(255,215,0,0.6);
     }
-    /* make the Arabic header right‑aligned */
     .ar {
       direction: rtl;
-      font-family: 'Cinzel', serif;
+      font-family:'Cinzel', serif;
+      margin-bottom:2rem;
     }
     form {
       display:flex;
@@ -35,15 +39,19 @@
       width:90%;
       max-width:320px;
     }
+    input, button {
+      border-radius:6px;
+      font-size:1rem;
+      outline:none;
+      transition: box-shadow .2s, background .2s, transform .1s;
+    }
     input {
       padding:.75rem 1rem;
       border:1px solid #ffd700;
-      border-radius:6px;
       background:rgba(0,0,0,0.8);
       color:#ffd700;
-      font-size:1rem;
-      outline:none;
-      transition:box-shadow .2s;
+      width:100%;
+      box-sizing:border-box;
     }
     input:focus {
       box-shadow:0 0 8px rgba(255,215,0,0.8);
@@ -52,12 +60,9 @@
       padding:.75rem 1rem;
       background:#ffd700;
       color:#000;
-      font-size:1rem;
       font-weight:600;
       border:none;
-      border-radius:6px;
       cursor:pointer;
-      transition:background .2s,transform .1s;
     }
     button:hover {
       background:#ffea47;
@@ -69,25 +74,23 @@
   </style>
 </head>
 <body>
-  <!-- English header -->
   <h1 lang="en">Register to Bid</h1>
-  <!-- Arabic header -->
   <h1 lang="ar" class="ar">سجل للمزايدة</h1>
 
   <form id="registerForm"
         action="https://docs.google.com/forms/d/e/1FAIpQLSfhK8x6ck1KWtyRgTrem_uMx-cuGSvnNF63wkZfX_zdleUbng/formResponse"
         method="POST"
-        target="hidden_iframe"
-        onsubmit="submitted=true;">
-    <!-- TikTok Alias goes to both Firebase and Google Forms -->
+        target="hidden_iframe">
+    <!-- TikTok Alias -->
     <input
       name="entry.1409023092"
       type="text"
       placeholder="Your TikTok Alias"
       required
     >
-    <!-- WhatsApp Number only goes to Google Forms -->
+    <!-- International phone input -->
     <input
+      id="phone"
       name="entry.1749874347"
       type="tel"
       placeholder="WhatsApp Number"
@@ -96,14 +99,15 @@
     <button type="submit">Register</button>
   </form>
 
-  <!-- Hidden iframe keeps them on this page -->
+  <!-- Hidden iframe to prevent navigation -->
   <iframe name="hidden_iframe" style="display:none;"></iframe>
 
-  <!-- Firebase SDKs -->
+  <!-- intl-tel-input + Firebase -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/js/intlTelInput.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
   <script>
-    // 1) Initialize Firebase (same config as your auction page)
+    // 1) Initialize Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyCEzZsilk06LeSomZx3VlPdhQoe-GUqTuQ",
       authDomain: "rosayauktion.firebaseapp.com",
@@ -117,15 +121,48 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // 2) Optional thank‑you alert
+    // 2) intl-tel-input setup
+    const phoneInput = document.querySelector("#phone");
+    const iti = window.intlTelInput(phoneInput, {
+      initialCountry: "auto",
+      geoIpLookup: cb => {
+        fetch("https://ipinfo.io/json?token=<YOUR_TOKEN>")
+          .then(res => res.json())
+          .then(data => cb(data.country))
+          .catch(() => cb("us"));
+      },
+      utilsScript:
+        "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/js/utils.js"
+    });
+
+    // 3) On submit, format to E.164 and push to Firebase
+    const form = document.getElementById("registerForm");
+    form.addEventListener("submit", e => {
+      if (!iti.isValidNumber()) {
+        e.preventDefault();
+        alert("Please enter a valid phone number.");
+        return;
+      }
+      // replace value with full international number
+      phoneInput.value = iti.getNumber();
+      // push alias+phone to RTDB (optional)
+      const alias = form.querySelector('input[name="entry.1409023092"]').value.trim();
+      db.ref('bidders').push({
+        alias,
+        phone: phoneInput.value,
+        timestamp: Date.now()
+      });
+    });
+
+    // 4) Thank‑you alert
     let submitted = false;
-    const form = document.getElementById('registerForm');
-    form.addEventListener('submit', () => { submitted = true; });
+    form.addEventListener('submit', ()=> submitted = true);
     setInterval(() => {
       if (submitted) {
         alert('✅ Thanks! You’re registered to bid.');
         submitted = false;
         form.reset();
+        iti.setCountry("auto");
       }
     }, 300);
   </script>
