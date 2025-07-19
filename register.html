@@ -68,15 +68,35 @@
 
   <iframe name="hidden_iframe" style="display:none;"></iframe>
 
+  <!-- intl-tel-input -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/js/intlTelInput.min.js"
           integrity="sha512-****(hash)****"
           crossorigin="anonymous"></script>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
   <script>
-    // initialize intlTelInput on our phone field
+    // 1) Initialize Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyCEzZsilk06LeSomZx3VlPdhQoe-GUqTuQ",
+      authDomain: "rosayauktion.firebaseapp.com",
+      databaseURL: "https://rosayauktion-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "rosayauktion",
+      storageBucket: "rosayauktion.firebasestorage.app",
+      messagingSenderId: "853081785147",
+      appId: "1:853081785147:web:dd3fa69e2cff3e96a42d1e",
+      measurementId: "G-8MY9PX1RNH"
+    };
+    firebase.initializeApp(firebaseConfig);
+    // pointer to /registrations
+    const regsRef = firebase.database().ref('registrations');
+
+    // 2) intl-tel-input setup
     const phoneInput = document.querySelector("#phone");
     const iti = window.intlTelInput(phoneInput, {
       initialCountry: "auto",
-      geoIpLookup: (cb) => {
+      geoIpLookup: cb => {
         fetch("https://ipinfo.io/json?token=<YOUR_TOKEN>")
           .then(res => res.json())
           .then(data => cb(data.country))
@@ -86,19 +106,34 @@
         "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/js/utils.js"
     });
 
-    // on form submit, rewrite the input's value to full E.164
+    // 3) On form submit: validate, push to Firebase, then let Google Form post
     const form = document.getElementById("registerForm");
-    form.addEventListener("submit", (e) => {
-      if (iti.isValidNumber()) {
-        phoneInput.value = iti.getNumber();
-      } else {
+    let submitted = false;
+
+    form.addEventListener("submit", e => {
+      // validate phone
+      if (!iti.isValidNumber()) {
         e.preventDefault();
         alert("Please enter a valid phone number.");
+        return;
       }
+      const fullNumber = iti.getNumber();      // E.164 format
+      phoneInput.value = fullNumber;           // overwrite for Google Form
+
+      // gather alias
+      const alias = form.querySelector('input[name="entry.1409023092"]').value.trim();
+
+      // push into RTDB → triggers your server welcome-DM
+      regsRef.push({
+        alias,
+        whatsapp: fullNumber,
+        createdAt: Date.now()
+      }).catch(err => console.error("Firebase write failed:", err));
+
+      submitted = true;
     });
 
-    // thank-you alert
-    let submitted = false;
+    // 4) thank-you alert & reset
     setInterval(() => {
       if (submitted) {
         alert("✅ Thanks! You’re registered to bid.");
