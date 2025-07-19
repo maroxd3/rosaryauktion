@@ -7,7 +7,6 @@
   <link
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/css/intlTelInput.css"
-    integrity="sha512-****(hash)****"
     crossorigin="anonymous"
   />
   <style>
@@ -39,6 +38,29 @@
     }
     button:hover { background:#ffea47; transform:translateY(-2px); }
     button:active{ transform:translateY(0); }
+
+    /* —— Dark theme overrides for intl-tel-input dropdown —— */
+    .iti__flag-container {
+      background: #000 !important;
+    }
+    .iti__country-list, .iti__country-list .iti__country {
+      background: #000 !important;
+      color: #ffd700 !important;
+    }
+    .iti__country:hover, .iti__country.iti__highlight {
+      background: rgba(255,215,0,0.1) !important;
+    }
+    .iti__country-name, .iti__dial-code {
+      color: #ffd700 !important;
+    }
+    /* Hide default white scrollbar on dropdown */
+    .iti__country-list::-webkit-scrollbar {
+      width: 6px;
+    }
+    .iti__country-list::-webkit-scrollbar-thumb {
+      background: rgba(255,215,0,0.5);
+      border-radius: 3px;
+    }
   </style>
 </head>
 <body>
@@ -70,7 +92,6 @@
 
   <!-- intl-tel-input -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/js/intlTelInput.min.js"
-          integrity="sha512-****(hash)****"
           crossorigin="anonymous"></script>
 
   <!-- Firebase SDKs -->
@@ -89,7 +110,6 @@
       measurementId: "G-8MY9PX1RNH"
     };
     firebase.initializeApp(firebaseConfig);
-    // pointer to /registrations
     const regsRef = firebase.database().ref('registrations');
 
     // 2) intl-tel-input setup
@@ -111,24 +131,20 @@
     let submitted = false;
 
     form.addEventListener("submit", e => {
-      // validate phone
       if (!iti.isValidNumber()) {
         e.preventDefault();
         alert("Please enter a valid phone number.");
         return;
       }
-      const fullNumber = iti.getNumber();      // E.164 format
-      phoneInput.value = fullNumber;           // overwrite for Google Form
+      const fullNumber = iti.getNumber();
+      phoneInput.value = fullNumber;
 
-      // gather alias
       const alias = form.querySelector('input[name="entry.1409023092"]').value.trim();
-
-      // push into RTDB → triggers your server welcome-DM
       regsRef.push({
         alias,
         whatsapp: fullNumber,
         createdAt: Date.now()
-      }).catch(err => console.error("Firebase write failed:", err));
+      });
 
       submitted = true;
     });
