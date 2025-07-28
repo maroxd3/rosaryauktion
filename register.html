@@ -31,6 +31,7 @@
       transition:box-shadow .2s;
     }
     input:focus { box-shadow:0 0 8px rgba(255,215,0,0.8); }
+    input.error { border-color: #ff4444; box-shadow:0 0 8px rgba(255,68,68,0.6); }
     button {
       background:#ffd700; color:#000; font-weight:600;
       border:none; transition:background .2s,transform .1s;
@@ -38,6 +39,42 @@
     }
     button:hover { background:#ffea47; transform:translateY(-2px); }
     button:active{ transform:translateY(0); }
+
+    .warning {
+      background: rgba(255,215,0,0.1);
+      border: 1px solid #ffd700;
+      color: #ffd700;
+      padding: 0.8rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+
+    .example {
+      background: rgba(255,215,0,0.1);
+      border: 1px solid #ffd700;
+      padding: 0.8rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+    }
+
+    .example-title {
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .good { color: #44ff44; }
+    .bad { color: #ff4444; }
+
+    .help-text {
+      font-size: 0.8rem;
+      color: #ffd700;
+      opacity: 0.8;
+      margin-top: 0.3rem;
+      text-align: left;
+    }
 
     /* —— Dark theme overrides for intl-tel-input dropdown —— */
     .iti__flag-container {
@@ -65,19 +102,39 @@
 </head>
 <body>
   <h1>Register to Bid</h1>
-  <h1 lang="ar" class="ar">سجل للمزايدة</h1>
+  <h1 lang="ar" class="ar">سجل للمزايدة</h1>
+
+  <div class="warning">
+    💡 Please use your TikTok username (not your real name)<br>
+    <span lang="ar">💡 يرجى استخدام اسم المستخدم في تيك توك (وليس اسمك الحقيقي)</span>
+  </div>
+
+  <div class="example">
+    <div class="example-title">Examples / أمثلة:</div>
+    <div class="good">✅ @user123 or user123</div>
+    <div class="good">✅ @coolgamer2024</div>
+    <div class="bad">❌ John Smith / أحمد محمد</div>
+    <div class="bad">❌ Sarah Johnson / فاطمة علي</div>
+  </div>
 
   <form id="registerForm"
         action="https://docs.google.com/forms/d/e/1FAIpQLSfhK8x6ck1KWtyRgTrem_uMx-cuGSvnNF63wkZfX_zdleUbng/formResponse"
         method="POST"
         target="hidden_iframe"
         onsubmit="submitted=true;">
-    <input
-      name="entry.1409023092"
-      type="text"
-      placeholder="Your TikTok Alias"
-      required
-    >
+    <div>
+      <input
+        id="tiktokAlias"
+        name="entry.1409023092"
+        type="text"
+        placeholder="@your_tiktok_username / @اسم_المستخدم_تيك_توك"
+        required
+      >
+      <div class="help-text">
+        Find your username in TikTok: Profile → Copy username<br>
+        <span lang="ar">ابحث عن اسم المستخدم في تيك توك: الملف الشخصي ← نسخ اسم المستخدم</span>
+      </div>
+    </div>
     <input
       id="phone"
       name="entry.1749874347"
@@ -85,7 +142,7 @@
       placeholder="WhatsApp Number"
       required
     >
-    <button type="submit">Register</button>
+    <button type="submit" id="submitBtn">Register</button>
   </form>
 
   <iframe name="hidden_iframe" style="display:none;"></iframe>
@@ -126,36 +183,133 @@
         "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/js/utils.js"
     });
 
-    // 3) On form submit: validate, push to Firebase, then let Google Form post
+    // 3) TikTok username validation
+    const tiktokInput = document.getElementById('tiktokAlias');
+    const submitBtn = document.getElementById('submitBtn');
+
+    function validateTikTokUsername(username) {
+      const trimmed = username.trim();
+      
+      // Remove @ if present
+      const cleaned = trimmed.startsWith('@') ? trimmed.slice(1) : trimmed;
+      
+      // Check if it looks like a real name (contains space and capital letters)
+      const hasSpace = cleaned.includes(' ');
+      const hasMultipleCapitals = (cleaned.match(/[A-Z]/g) || []).length > 1;
+      const isLikelyRealName = hasSpace && hasMultipleCapitals;
+      
+      // Check if it's too short or contains invalid characters
+      const isValidFormat = /^[a-zA-Z0-9_.]+$/.test(cleaned) && cleaned.length >= 2;
+      
+      // Common real name patterns
+      const realNamePatterns = [
+        /^[A-Z][a-z]+ [A-Z][a-z]+$/, // "John Smith"
+        /^[A-Z][a-z]+\s+[A-Z]\.$/, // "John S."
+        /\b(Mr|Mrs|Ms|Dr)\.?\s/i, // Titles
+        // Arabic name patterns
+        /^[\u0600-\u06FF]+ [\u0600-\u06FF]+$/, // "أحمد محمد"
+        /^[\u0600-\u06FF]+\s+[\u0600-\u06FF]+\s+[\u0600-\u06FF]+$/, // "أحمد محمد علي"
+      ];
+      
+      const matchesRealNamePattern = realNamePatterns.some(pattern => 
+        pattern.test(trimmed)
+      );
+      
+      return {
+        isValid: isValidFormat && !isLikelyRealName && !matchesRealNamePattern,
+        cleaned: cleaned,
+        isLikelyRealName: isLikelyRealName || matchesRealNamePattern
+      };
+    }
+
+    // Real-time validation
+    tiktokInput.addEventListener('input', function() {
+      const validation = validateTikTokUsername(this.value);
+      
+      if (this.value.length > 0) {
+        if (validation.isValid) {
+          this.classList.remove('error');
+        } else {
+          this.classList.add('error');
+        }
+      } else {
+        this.classList.remove('error');
+      }
+    });
+
+    // 4) On form submit: validate everything
     const form = document.getElementById("registerForm");
     let submitted = false;
 
     form.addEventListener("submit", e => {
+      e.preventDefault();
+      
+      // Validate phone
       if (!iti.isValidNumber()) {
-        e.preventDefault();
-        alert("Please enter a valid phone number.");
+        alert("Please check your phone number 📱\nيرجى التحقق من رقم الهاتف 📱");
         return;
       }
+      
+      // Validate TikTok username
+      const aliasValue = tiktokInput.value;
+      const validation = validateTikTokUsername(aliasValue);
+      
+      if (!validation.isValid) {
+        let errorMsg = "Let's make sure you're using your TikTok username! 😊\nدعنا نتأكد أنك تستخدم اسم المستخدم في تيك توك! 😊\n\n";
+        
+        if (validation.isLikelyRealName) {
+          errorMsg += "This looks like your real name 📝\nهذا يبدو كاسمك الحقيقي 📝\n";
+          errorMsg += "We need your TikTok username instead (like: @user123) 📱\nنحتاج اسم المستخدم في تيك توك بدلاً من ذلك (مثل: @user123) 📱\n\n";
+        } else if (!/^[a-zA-Z0-9_.]+$/.test(validation.cleaned)) {
+          errorMsg += "TikTok usernames use letters, numbers, dots and underscores only 📝\nأسماء المستخدمين في تيك توك تستخدم الأحرف والأرقام والنقاط والشرطات السفلية فقط 📝\n\n";
+        } else if (validation.cleaned.length < 2) {
+          errorMsg += "Your username seems a bit short 📏\nاسم المستخدم يبدو قصيراً قليلاً 📏\n\n";
+        }
+        
+        errorMsg += "Find your username: TikTok app → Profile → Your username is at the top!\nابحث عن اسم المستخدم: تطبيق تيك توك ← الملف الشخصي ← اسم المستخدم في الأعلى!";
+        
+        alert(errorMsg);
+        tiktokInput.classList.add('error');
+        tiktokInput.focus();
+        return;
+      }
+
+      // Final confirmation for suspicious entries
+      if (validation.cleaned.length < 4 || !/[0-9]/.test(validation.cleaned)) {
+        const confirmMsg = `Just checking - is "${validation.cleaned}" your TikTok username? 🤔\nفقط للتأكد - هل "${validation.cleaned}" هو اسم المستخدم في تيك توك؟ 🤔\n\n` +
+                          `We want to make sure your bids work perfectly! 💫\nنريد التأكد من أن مزايداتك تعمل بشكل مثالي! 💫`;
+        
+        if (!confirm(confirmMsg)) {
+          return;
+        }
+      }
+
+      // Set cleaned values
       const fullNumber = iti.getNumber();
       phoneInput.value = fullNumber;
+      tiktokInput.value = validation.cleaned.startsWith('@') ? validation.cleaned : '@' + validation.cleaned;
 
-      const alias = form.querySelector('input[name="entry.1409023092"]').value.trim();
+      // Save to Firebase
       regsRef.push({
-        alias,
+        alias: tiktokInput.value,
         whatsapp: fullNumber,
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        validated: true
       });
 
+      // Submit to Google Form
       submitted = true;
+      form.submit();
     });
 
-    // 4) thank-you alert & reset
+    // 5) thank-you alert & reset
     setInterval(() => {
       if (submitted) {
-        alert("✅ Thanks! You’re registered to bid.");
+        alert("🎉 Perfect! You're all set to bid with: " + tiktokInput.value + "\n🎉 ممتاز! أنت جاهز للمزايدة باسم: " + tiktokInput.value);
         submitted = false;
         form.reset();
         iti.setCountry("us");
+        tiktokInput.classList.remove('error');
       }
     }, 300);
   </script>
