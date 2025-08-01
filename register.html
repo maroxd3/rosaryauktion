@@ -50,6 +50,7 @@
     
     button:hover { background:#ffea47; transform:translateY(-2px); }
     button:active{ transform:translateY(0); }
+    button:disabled { background:#666; cursor:not-allowed; transform:none; }
 
     .warning {
       background: rgba(255,215,0,0.1);
@@ -243,6 +244,11 @@
     .iti__country-list {
       z-index: 1001 !important;
     }
+
+    .loading {
+      color: #ffd700;
+      opacity: 0.7;
+    }
   </style>
 </head>
 <body>
@@ -388,10 +394,10 @@
       onlyCountries: allowedCountries,
       preferredCountries: ['us', 'de', 'fr', 'gb', 'ae', 'sa', 'eg'],
       geoIpLookup: cb => {
-        fetch("https://ipinfo.io/json?token=<YOUR_TOKEN>")
+        fetch("https://ipinfo.io/json")
           .then(res => res.json())
           .then(data => cb(data.country))
-          .catch(() => cb("us"));
+          .catch(() => cb("de"));
       },
       utilsScript:
         "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/js/utils.js"
@@ -444,64 +450,68 @@
       }
     });
 
-    // 4) TikTok username validation
+    // 4) TikTok username validation - MUCH MORE RELAXED
     const tiktokInput = document.getElementById('tiktokAlias');
     const submitBtn = document.getElementById('submitBtn');
 
     function validateTikTokUsername(username) {
       const trimmed = username.trim();
       
+      if (!trimmed || trimmed.length === 0) {
+        return { isValid: false, cleaned: '', isEmpty: true };
+      }
+      
       // Remove @ if present
       const cleaned = trimmed.startsWith('@') ? trimmed.slice(1) : trimmed;
       
-      // Check if it looks like a real name (contains space and capital letters)
-      const hasSpace = cleaned.includes(' ');
-      const hasMultipleCapitals = (cleaned.match(/[A-Z]/g) || []).length > 1;
-      const isLikelyRealName = hasSpace && hasMultipleCapitals;
+      // Very basic validation - just check if it's not empty and has some basic format
+      const isValidFormat = cleaned.length >= 1 && cleaned.length <= 50;
       
-      // Check if it's too short or contains invalid characters
-      const isValidFormat = /^[a-zA-Z0-9_.]+$/.test(cleaned) && cleaned.length >= 2;
-      
-      // Common real name patterns
-      const realNamePatterns = [
-        /^[A-Z][a-z]+ [A-Z][a-z]+$/, // "John Smith"
-        /^[A-Z][a-z]+\s+[A-Z]\.$/, // "John S."
-        /\b(Mr|Mrs|Ms|Dr)\.?\s/i, // Titles
-        // Arabic name patterns
-        /^[\u0600-\u06FF]+ [\u0600-\u06FF]+$/, // "أحمد محمد"
-        /^[\u0600-\u06FF]+\s+[\u0600-\u06FF]+\s+[\u0600-\u06FF]+$/, // "أحمد محمد علي"
+      // Only block if it's OBVIOUSLY a real name with very specific patterns
+      const obviousRealNamePatterns = [
+        /^[A-Z][a-z]+ [A-Z][a-z]+$/, // "John Smith" exactly
+        /^Mr\.?\s+[A-Z][a-z]+/i, // "Mr. John"
+        /^Mrs\.?\s+[A-Z][a-z]+/i, // "Mrs. Jane"
+        /^Dr\.?\s+[A-Z][a-z]+/i, // "Dr. Smith"
       ];
       
-      const matchesRealNamePattern = realNamePatterns.some(pattern => 
-        pattern.test(trimmed)
-      );
+      const isObviousRealName = obviousRealNamePatterns.some(pattern => pattern.test(trimmed));
       
       return {
-        isValid: isValidFormat && !isLikelyRealName && !matchesRealNamePattern,
+        isValid: isValidFormat && !isObviousRealName,
         cleaned: cleaned,
-        isLikelyRealName: isLikelyRealName || matchesRealNamePattern
+        isLikelyRealName: isObviousRealName
       };
     }
 
-    // Real-time validation
+    // Much more lenient real-time validation
     tiktokInput.addEventListener('input', function() {
       const validation = validateTikTokUsername(this.value);
       
       if (this.value.length > 0) {
         if (validation.isValid) {
           this.classList.remove('error');
-        } else {
+        } else if (validation.isLikelyRealName) {
           this.classList.add('error');
+        } else {
+          this.classList.remove('error');
         }
       } else {
         this.classList.remove('error');
       }
     });
 
-    // 5) Check for duplicates function
+    // 5) Check for duplicates function - WITH TIMEOUT AND FALLBACK
     async function checkForDuplicates(username, phoneNumber) {
       try {
-        const snapshot = await regsRef.once('value');
+        // Add timeout to the Firebase call
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout')), 5000)
+        );
+        
+        const dataPromise = regsRef.once('value');
+        
+        const snapshot = await Promise.race([dataPromise, timeoutPromise]);
         const registrations = snapshot.val();
         
         if (!registrations) return { isDuplicate: false };
@@ -531,11 +541,13 @@
         return { isDuplicate: false };
       } catch (error) {
         console.error('Error checking duplicates:', error);
-        throw error;
+        // If duplicate check fails, allow registration to proceed
+        console.warn('Duplicate check failed, allowing registration to proceed');
+        return { isDuplicate: false };
       }
     }
 
-    // 6) Form submission with duplicate checking
+    // 6) Form submission with better error handling
     const form = document.getElementById("registerForm");
     let isSubmitting = false;
 
@@ -545,42 +557,60 @@
       if (isSubmitting) return;
       isSubmitting = true;
       
+      // Update button to show loading
+      const originalButtonText = submitBtn.textContent;
+      submitBtn.textContent = 'Registering...';
+      submitBtn.disabled = true;
+      
       try {
-        // Validate phone
-        if (!iti.isValidNumber()) {
-          showError("Please check your phone number 📱<br><span lang='ar'>يرجى التحقق من رقم الهاتف 📱</span>");
-          isSubmitting = false;
+        // Validate phone - but be more lenient
+        if (!phoneInput.value.trim()) {
+          showError("Please enter your phone number 📱<br><span lang='ar'>يرجى إدخال رقم الهاتف 📱</span>");
           return;
         }
         
-        // Validate TikTok username
+        let fullNumber;
+        try {
+          if (iti.isValidNumber()) {
+            fullNumber = iti.getNumber();
+          } else {
+            // Try to use the raw input if validation fails
+            fullNumber = phoneInput.value.trim();
+            console.warn('Phone validation failed, using raw input:', fullNumber);
+          }
+        } catch (phoneError) {
+          console.error('Phone validation error:', phoneError);
+          fullNumber = phoneInput.value.trim();
+        }
+        
+        // Validate TikTok username - very lenient
         const aliasValue = tiktokInput.value;
         const validation = validateTikTokUsername(aliasValue);
         
         if (!validation.isValid) {
-          let errorMsg = "Let's make sure you're using your TikTok username! 😊<br><span lang='ar'>دعنا نتأكد أنك تستخدم اسم المستخدم في تيك توك! 😊</span><br><br>";
-          
-          if (validation.isLikelyRealName) {
-            errorMsg += "This looks like your real name 📝<br><span lang='ar'>هذا يبدو كاسمك الحقيقي 📝</span><br>";
-            errorMsg += "We need your TikTok username instead (like: @user123) 📱<br><span lang='ar'>نحتاج اسم المستخدم في تيك توك بدلاً من ذلك (مثل: @user123) 📱</span>";
-          } else if (!/^[a-zA-Z0-9_.]+$/.test(validation.cleaned)) {
-            errorMsg += "TikTok usernames use letters, numbers, dots and underscores only 📝<br><span lang='ar'>أسماء المستخدمين في تيك توك تستخدم الأحرف والأرقام والنقاط والشرطات السفلية فقط 📝</span>";
-          } else if (validation.cleaned.length < 2) {
-            errorMsg += "Your username seems a bit short 📏<br><span lang='ar'>اسم المستخدم يبدو قصيراً قليلاً 📏</span>";
+          if (validation.isEmpty) {
+            showError("Please enter your TikTok username! 📱<br><span lang='ar'>يرجى إدخال اسم المستخدم في تيك توك! 📱</span>");
+            tiktokInput.focus();
+            return;
           }
           
-          showError(errorMsg);
-          tiktokInput.classList.add('error');
-          isSubmitting = false;
-          return;
+          if (validation.isLikelyRealName) {
+            showError("This looks like your real name 📝<br><span lang='ar'>هذا يبدو كاسمك الحقيقي 📝</span><br>We need your TikTok username instead (like: @user123) 📱<br><span lang='ar'>نحتاج اسم المستخدم في تيك توك بدلاً من ذلك (مثل: @user123) 📱</span>");
+            tiktokInput.classList.add('error');
+            return;
+          }
         }
 
         // Prepare cleaned values
-        const fullNumber = iti.getNumber();
         const finalUsername = validation.cleaned.startsWith('@') ? validation.cleaned : '@' + validation.cleaned;
 
-        // Check for duplicates
-        const duplicateCheck = await checkForDuplicates(finalUsername, fullNumber);
+        // Try to check for duplicates, but don't block if it fails
+        let duplicateCheck = { isDuplicate: false };
+        try {
+          duplicateCheck = await checkForDuplicates(finalUsername, fullNumber);
+        } catch (dupError) {
+          console.error('Duplicate check failed, proceeding anyway:', dupError);
+        }
         
         if (duplicateCheck.isDuplicate) {
           showError(duplicateCheck.message);
@@ -594,7 +624,6 @@
             phoneInput.focus();
           }
           
-          isSubmitting = false;
           return;
         }
 
@@ -602,15 +631,19 @@
         phoneInput.value = fullNumber;
         tiktokInput.value = finalUsername;
 
-        // Save to Firebase
-        await regsRef.push({
-          alias: finalUsername,
-          whatsapp: fullNumber,
-          createdAt: Date.now(),
-          validated: true,
-          userAgent: navigator.userAgent,
-          ip: await fetch('https://api.ipify.org?format=json').then(r => r.json()).then(d => d.ip).catch(() => 'unknown')
-        });
+        // Try to save to Firebase, but don't block if it fails
+        try {
+          await regsRef.push({
+            alias: finalUsername,
+            whatsapp: fullNumber,
+            createdAt: Date.now(),
+            validated: true,
+            userAgent: navigator.userAgent,
+            ip: 'unknown'
+          });
+        } catch (firebaseError) {
+          console.error('Firebase save failed, but continuing with Google Form:', firebaseError);
+        }
 
         // Submit to Google Form
         const tempForm = form.cloneNode(true);
@@ -627,12 +660,15 @@
           iti.setCountry("de");
           tiktokInput.classList.remove('error');
           phoneInput.classList.remove('error');
-          isSubmitting = false;
         }, 1000);
         
       } catch (error) {
         console.error('Registration error:', error);
-        showError("Something went wrong. Please try again in a moment. 🔄<br><span lang='ar'>حدث خطأ ما. يرجى المحاولة مرة أخرى بعد قليل. 🔄</span>");
+        showError("Something went wrong, but your registration might have gone through. Please check or try again. 🔄<br><span lang='ar'>حدث خطأ ما، لكن تسجيلك ربما تم. يرجى التحقق أو المحاولة مرة أخرى. 🔄</span>");
+      } finally {
+        // Reset button
+        submitBtn.textContent = originalButtonText;
+        submitBtn.disabled = false;
         isSubmitting = false;
       }
     });
