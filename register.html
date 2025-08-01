@@ -498,58 +498,120 @@
       }
     });
 
-    // 5) Form submission
+    // 5) Check for duplicates function
+    async function checkForDuplicates(username, phoneNumber) {
+      try {
+        const snapshot = await regsRef.once('value');
+        const registrations = snapshot.val();
+        
+        if (!registrations) return { isDuplicate: false };
+        
+        for (let key in registrations) {
+          const reg = registrations[key];
+          
+          // Check for username duplicate (case insensitive)
+          if (reg.alias && reg.alias.toLowerCase() === username.toLowerCase()) {
+            return { 
+              isDuplicate: true, 
+              type: 'username',
+              message: `This TikTok username is already registered! 🔒<br><span lang='ar'>اسم المستخدم هذا مسجل بالفعل! 🔒</span><br><br>If this is your account, you're already registered for bidding! ✅<br><span lang='ar'>إذا كان هذا حسابك، فأنت مسجل بالفعل للمزايدة! ✅</span>`
+            };
+          }
+          
+          // Check for phone duplicate
+          if (reg.whatsapp && reg.whatsapp === phoneNumber) {
+            return { 
+              isDuplicate: true, 
+              type: 'phone',
+              message: `This phone number is already registered! 📱<br><span lang='ar'>رقم الهاتف هذا مسجل بالفعل! 📱</span><br><br>Each phone number can only be used once. ⚠️<br><span lang='ar'>كل رقم هاتف يمكن استخدامه مرة واحدة فقط. ⚠️</span>`
+            };
+          }
+        }
+        
+        return { isDuplicate: false };
+      } catch (error) {
+        console.error('Error checking duplicates:', error);
+        throw error;
+      }
+    }
+
+    // 6) Form submission with duplicate checking
     const form = document.getElementById("registerForm");
     let isSubmitting = false;
 
-    form.addEventListener("submit", e => {
+    form.addEventListener("submit", async e => {
       e.preventDefault();
       
       if (isSubmitting) return;
       isSubmitting = true;
       
-      // Validate phone
-      if (!iti.isValidNumber()) {
-        showError("Please check your phone number 📱<br><span lang='ar'>يرجى التحقق من رقم الهاتف 📱</span>");
-        isSubmitting = false;
-        return;
-      }
-      
-      // Validate TikTok username
-      const aliasValue = tiktokInput.value;
-      const validation = validateTikTokUsername(aliasValue);
-      
-      if (!validation.isValid) {
-        let errorMsg = "Let's make sure you're using your TikTok username! 😊<br><span lang='ar'>دعنا نتأكد أنك تستخدم اسم المستخدم في تيك توك! 😊</span><br><br>";
-        
-        if (validation.isLikelyRealName) {
-          errorMsg += "This looks like your real name 📝<br><span lang='ar'>هذا يبدو كاسمك الحقيقي 📝</span><br>";
-          errorMsg += "We need your TikTok username instead (like: @user123) 📱<br><span lang='ar'>نحتاج اسم المستخدم في تيك توك بدلاً من ذلك (مثل: @user123) 📱</span>";
-        } else if (!/^[a-zA-Z0-9_.]+$/.test(validation.cleaned)) {
-          errorMsg += "TikTok usernames use letters, numbers, dots and underscores only 📝<br><span lang='ar'>أسماء المستخدمين في تيك توك تستخدم الأحرف والأرقام والنقاط والشرطات السفلية فقط 📝</span>";
-        } else if (validation.cleaned.length < 2) {
-          errorMsg += "Your username seems a bit short 📏<br><span lang='ar'>اسم المستخدم يبدو قصيراً قليلاً 📏</span>";
+      try {
+        // Validate phone
+        if (!iti.isValidNumber()) {
+          showError("Please check your phone number 📱<br><span lang='ar'>يرجى التحقق من رقم الهاتف 📱</span>");
+          isSubmitting = false;
+          return;
         }
         
-        showError(errorMsg);
-        tiktokInput.classList.add('error');
-        isSubmitting = false;
-        return;
-      }
+        // Validate TikTok username
+        const aliasValue = tiktokInput.value;
+        const validation = validateTikTokUsername(aliasValue);
+        
+        if (!validation.isValid) {
+          let errorMsg = "Let's make sure you're using your TikTok username! 😊<br><span lang='ar'>دعنا نتأكد أنك تستخدم اسم المستخدم في تيك توك! 😊</span><br><br>";
+          
+          if (validation.isLikelyRealName) {
+            errorMsg += "This looks like your real name 📝<br><span lang='ar'>هذا يبدو كاسمك الحقيقي 📝</span><br>";
+            errorMsg += "We need your TikTok username instead (like: @user123) 📱<br><span lang='ar'>نحتاج اسم المستخدم في تيك توك بدلاً من ذلك (مثل: @user123) 📱</span>";
+          } else if (!/^[a-zA-Z0-9_.]+$/.test(validation.cleaned)) {
+            errorMsg += "TikTok usernames use letters, numbers, dots and underscores only 📝<br><span lang='ar'>أسماء المستخدمين في تيك توك تستخدم الأحرف والأرقام والنقاط والشرطات السفلية فقط 📝</span>";
+          } else if (validation.cleaned.length < 2) {
+            errorMsg += "Your username seems a bit short 📏<br><span lang='ar'>اسم المستخدم يبدو قصيراً قليلاً 📏</span>";
+          }
+          
+          showError(errorMsg);
+          tiktokInput.classList.add('error');
+          isSubmitting = false;
+          return;
+        }
 
-      // Set cleaned values
-      const fullNumber = iti.getNumber();
-      phoneInput.value = fullNumber;
-      const finalUsername = validation.cleaned.startsWith('@') ? validation.cleaned : '@' + validation.cleaned;
-      tiktokInput.value = finalUsername;
+        // Prepare cleaned values
+        const fullNumber = iti.getNumber();
+        const finalUsername = validation.cleaned.startsWith('@') ? validation.cleaned : '@' + validation.cleaned;
 
-      // Save to Firebase
-      regsRef.push({
-        alias: finalUsername,
-        whatsapp: fullNumber,
-        createdAt: Date.now(),
-        validated: true
-      }).then(() => {
+        // Check for duplicates
+        const duplicateCheck = await checkForDuplicates(finalUsername, fullNumber);
+        
+        if (duplicateCheck.isDuplicate) {
+          showError(duplicateCheck.message);
+          
+          // Highlight the problematic field
+          if (duplicateCheck.type === 'username') {
+            tiktokInput.classList.add('error');
+            tiktokInput.focus();
+          } else if (duplicateCheck.type === 'phone') {
+            phoneInput.classList.add('error');
+            phoneInput.focus();
+          }
+          
+          isSubmitting = false;
+          return;
+        }
+
+        // Update form values
+        phoneInput.value = fullNumber;
+        tiktokInput.value = finalUsername;
+
+        // Save to Firebase
+        await regsRef.push({
+          alias: finalUsername,
+          whatsapp: fullNumber,
+          createdAt: Date.now(),
+          validated: true,
+          userAgent: navigator.userAgent,
+          ip: await fetch('https://api.ipify.org?format=json').then(r => r.json()).then(d => d.ip).catch(() => 'unknown')
+        });
+
         // Submit to Google Form
         const tempForm = form.cloneNode(true);
         document.body.appendChild(tempForm);
@@ -562,15 +624,17 @@
         // Reset form
         setTimeout(() => {
           form.reset();
-          iti.setCountry("de"); // Default to Germany instead of US
+          iti.setCountry("de");
           tiktokInput.classList.remove('error');
+          phoneInput.classList.remove('error');
           isSubmitting = false;
         }, 1000);
-      }).catch(error => {
-        console.error('Firebase error:', error);
-        showError("Registration failed. Please try again.<br><span lang='ar'>فشل التسجيل. يرجى المحاولة مرة أخرى.</span>");
+        
+      } catch (error) {
+        console.error('Registration error:', error);
+        showError("Something went wrong. Please try again in a moment. 🔄<br><span lang='ar'>حدث خطأ ما. يرجى المحاولة مرة أخرى بعد قليل. 🔄</span>");
         isSubmitting = false;
-      });
+      }
     });
   </script>
 </body>
