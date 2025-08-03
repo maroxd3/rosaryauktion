@@ -7,8 +7,6 @@
   <link
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/css/intlTelInput.css"
-    integrity="sha512-gxWow8Mo6q6pLa1XH/CcH8JyiSDEtiwJV78E+D+QP0EVasFs8wKXq8YLAaPeJQEBVfzkh5anjqig4G4X20w5/Q=="
-    crossorigin="anonymous"
   />
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&display=swap');
@@ -29,9 +27,36 @@
     }
     input {
       border:1px solid #ffd700; background:rgba(0,0,0,0.8); color:#ffd700;
-      transition:box-shadow .2s;
+      transition:box-shadow .2s; box-sizing: border-box;
     }
     input:focus { box-shadow:0 0 8px rgba(255,215,0,0.8); }
+    
+    /* Fix for intl-tel-input styling */
+    .iti { width: 100% !important; }
+    .iti input { width: 100% !important; padding-left: 52px !important; }
+    .iti__flag-container { 
+      background: rgba(0,0,0,0.8) !important; 
+      border-right: 1px solid #ffd700 !important;
+    }
+    .iti__selected-flag { 
+      background: rgba(0,0,0,0.8) !important;
+      border: none !important;
+      padding: 0 8px !important;
+    }
+    .iti__country-list {
+      background: #000 !important;
+      border: 1px solid #ffd700 !important;
+      color: #ffd700 !important;
+      max-height: 200px !important;
+      overflow-y: auto !important;
+    }
+    .iti__country {
+      padding: 8px 12px !important;
+      border-bottom: 1px solid #333 !important;
+    }
+    .iti__country:hover, .iti__country.iti__highlight {
+      background: rgba(255,215,0,0.1) !important;
+    }
     button {
       background:#ffd700; color:#000; font-weight:600;
       border:none; transition:background .2s,transform .1s;
@@ -69,9 +94,7 @@
   <iframe name="hidden_iframe" style="display:none;"></iframe>
 
   <!-- intl-tel-input -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/js/intlTelInput.min.js"
-          integrity="sha512-+gHzOStaOEgl6o3O6KEmYLrAjVvZKid6wkvGf9lBTxCaegF/WaO1PdVY8XiB32WVjU08LIGALJhH8e7dYYmvXg=="
-          crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/js/intlTelInput.min.js"></script>
 
   <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
@@ -97,24 +120,13 @@
     const iti = window.intlTelInput(phoneInput, {
       initialCountry: "de", // Default to Germany
       preferredCountries: ["de", "at", "ch", "nl", "be", "fr", "pl", "dk", "se", "no"], // Germany and neighboring/nearby EU countries first
-      onlyCountries: [
-        // EU countries + nearby important ones, with Germany and neighbors prioritized
-        "de", "at", "ch", "nl", "be", "fr", "pl", "dk", "se", "no", "fi", 
-        "it", "es", "pt", "ie", "lu", "cz", "sk", "hu", "si", "hr", "ro", 
-        "bg", "gr", "cy", "mt", "lt", "lv", "ee", "gb", "is", "li", "mc", "ad", "sm", "va"
-      ],
       geoIpLookup: cb => {
         fetch("https://ipinfo.io/json")
           .then(res => res.json())
           .then(data => {
-            // If detected country is in our EU list, use it; otherwise default to Germany
-            const euCountries = [
-              "de", "at", "ch", "nl", "be", "fr", "pl", "dk", "se", "no", "fi", 
-              "it", "es", "pt", "ie", "lu", "cz", "sk", "hu", "si", "hr", "ro", 
-              "bg", "gr", "cy", "mt", "lt", "lv", "ee", "gb", "is", "li", "mc", "ad", "sm", "va"
-            ];
+            // If detected country is EU/European, use it; otherwise default to Germany
             const detectedCountry = data.country ? data.country.toLowerCase() : "de";
-            cb(euCountries.includes(detectedCountry) ? detectedCountry : "de");
+            cb(detectedCountry);
           })
           .catch(() => cb("de")); // Default to Germany if lookup fails
       },
