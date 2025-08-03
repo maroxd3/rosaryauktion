@@ -7,6 +7,7 @@
   <link
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/css/intlTelInput.css"
+    integrity="sha512-gxWow8Mo6q6pLa1XH/CcH8JyiSDEtiwJV78E+D+QP0EVasFs8wKXq8YLAaPeJQEBVfzkh5anjqig4G4X20w5/Q=="
     crossorigin="anonymous"
   />
   <style>
@@ -38,34 +39,11 @@
     }
     button:hover { background:#ffea47; transform:translateY(-2px); }
     button:active{ transform:translateY(0); }
-
-    /* —— Dark theme overrides for intl-tel-input dropdown —— */
-    .iti__flag-container {
-      background: #000 !important;
-    }
-    .iti__country-list, .iti__country-list .iti__country {
-      background: #000 !important;
-      color: #ffd700 !important;
-    }
-    .iti__country:hover, .iti__country.iti__highlight {
-      background: rgba(255,215,0,0.1) !important;
-    }
-    .iti__country-name, .iti__dial-code {
-      color: #ffd700 !important;
-    }
-    /* Hide default white scrollbar on dropdown */
-    .iti__country-list::-webkit-scrollbar {
-      width: 6px;
-    }
-    .iti__country-list::-webkit-scrollbar-thumb {
-      background: rgba(255,215,0,0.5);
-      border-radius: 3px;
-    }
   </style>
 </head>
 <body>
   <h1>Register to Bid</h1>
-  <h1 lang="ar" class="ar">سجل للمزايدة</h1>
+  <h1 lang="ar" class="ar">سجل للمزايدة</h1>
 
   <form id="registerForm"
         action="https://docs.google.com/forms/d/e/1FAIpQLSfhK8x6ck1KWtyRgTrem_uMx-cuGSvnNF63wkZfX_zdleUbng/formResponse"
@@ -92,6 +70,7 @@
 
   <!-- intl-tel-input -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/js/intlTelInput.min.js"
+          integrity="sha512-+gHzOStaOEgl6o3O6KEmYLrAjVvZKid6wkvGf9lBTxCaegF/WaO1PdVY8XiB32WVjU08LIGALJhH8e7dYYmvXg=="
           crossorigin="anonymous"></script>
 
   <!-- Firebase SDKs -->
@@ -110,17 +89,34 @@
       measurementId: "G-8MY9PX1RNH"
     };
     firebase.initializeApp(firebaseConfig);
+    // pointer to /registrations
     const regsRef = firebase.database().ref('registrations');
 
-    // 2) intl-tel-input setup
+    // 2) intl-tel-input setup with EU focus
     const phoneInput = document.querySelector("#phone");
     const iti = window.intlTelInput(phoneInput, {
-      initialCountry: "auto",
+      initialCountry: "de", // Default to Germany
+      preferredCountries: ["de", "at", "ch", "nl", "be", "fr", "pl", "dk", "se", "no"], // Germany and neighboring/nearby EU countries first
+      onlyCountries: [
+        // EU countries + nearby important ones, with Germany and neighbors prioritized
+        "de", "at", "ch", "nl", "be", "fr", "pl", "dk", "se", "no", "fi", 
+        "it", "es", "pt", "ie", "lu", "cz", "sk", "hu", "si", "hr", "ro", 
+        "bg", "gr", "cy", "mt", "lt", "lv", "ee", "gb", "is", "li", "mc", "ad", "sm", "va"
+      ],
       geoIpLookup: cb => {
-        fetch("https://ipinfo.io/json?token=<YOUR_TOKEN>")
+        fetch("https://ipinfo.io/json")
           .then(res => res.json())
-          .then(data => cb(data.country))
-          .catch(() => cb("us"));
+          .then(data => {
+            // If detected country is in our EU list, use it; otherwise default to Germany
+            const euCountries = [
+              "de", "at", "ch", "nl", "be", "fr", "pl", "dk", "se", "no", "fi", 
+              "it", "es", "pt", "ie", "lu", "cz", "sk", "hu", "si", "hr", "ro", 
+              "bg", "gr", "cy", "mt", "lt", "lv", "ee", "gb", "is", "li", "mc", "ad", "sm", "va"
+            ];
+            const detectedCountry = data.country ? data.country.toLowerCase() : "de";
+            cb(euCountries.includes(detectedCountry) ? detectedCountry : "de");
+          })
+          .catch(() => cb("de")); // Default to Germany if lookup fails
       },
       utilsScript:
         "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/js/utils.js"
@@ -131,20 +127,24 @@
     let submitted = false;
 
     form.addEventListener("submit", e => {
+      // validate phone
       if (!iti.isValidNumber()) {
         e.preventDefault();
         alert("Please enter a valid phone number.");
         return;
       }
-      const fullNumber = iti.getNumber();
-      phoneInput.value = fullNumber;
+      const fullNumber = iti.getNumber();      // E.164 format
+      phoneInput.value = fullNumber;           // overwrite for Google Form
 
+      // gather alias
       const alias = form.querySelector('input[name="entry.1409023092"]').value.trim();
+
+      // push into RTDB → triggers your server welcome-DM
       regsRef.push({
         alias,
         whatsapp: fullNumber,
         createdAt: Date.now()
-      });
+      }).catch(err => console.error("Firebase write failed:", err));
 
       submitted = true;
     });
@@ -152,10 +152,10 @@
     // 4) thank-you alert & reset
     setInterval(() => {
       if (submitted) {
-        alert("✅ Thanks! You’re registered to bid.");
+        alert("✅ Thanks! You're registered to bid.");
         submitted = false;
         form.reset();
-        iti.setCountry("us");
+        iti.setCountry("de"); // Reset to Germany
       }
     }, 300);
   </script>
